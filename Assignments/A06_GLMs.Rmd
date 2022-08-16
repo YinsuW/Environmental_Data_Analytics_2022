@@ -1,6 +1,6 @@
 ---
 title: "Assignment 6: GLMs (Linear Regressios, ANOVA, & t-tests)"
-author: "Student Name"
+author: "Yinsu Wang"
 output: pdf_document
 geometry: margin=2.54cm
 editor_options: 
@@ -27,11 +27,19 @@ The completed exercise is due on Monday, February 28 at 7:00 pm.
 
 ```{r setup}
 #1
-
-
+getwd()
+library(tidyverse)
+#install.packages("agricolae")
+library(agricolae)
+library(lubridate)
+library(ggplot2)
+chemistry_physics<-read.csv("./Data/Raw/NTL-LTER_Lake_ChemistryPhysics_Raw.csv")
+chemistry_physics$sampledate<-as.Date(chemistry_physics$sampledate,format = "%m/%d/%y")
 #2
-
-
+mytheme <- theme_classic(base_size = 14) +
+  theme(axis.text = element_text(color = "black"), 
+        legend.position = "top")
+theme_set(mytheme)
 ```
 
 ## Simple regression
@@ -39,8 +47,8 @@ Our first research question is: Does mean lake temperature recorded during July 
 
 3. State the null and alternative hypotheses for this question:
 > Answer:
-H0: 
-Ha: 
+H0: mean lake temperature recorded during July is the same with depth across all lakes. 
+Ha: mean lake temperature recorded during July changes with depth across all lakes.
 
 
 4.  Wrangle your NTL-LTER dataset with a pipe function so that the records meet the following criteria: 
@@ -52,32 +60,42 @@ Ha:
 
 ```{r scatterplot}
 #4
-
-
+chemistry_physics<-chemistry_physics%>%
+  filter(month(sampledate)==7)%>%
+  select(lakename,year4,daynum,depth,temperature_C)%>%
+  filter(!is.na(lakename))%>%
+  filter(!is.na(year4))%>%
+  filter(!is.na(daynum))%>%
+  filter(!is.na(depth))%>%
+  filter(!is.na(temperature_C))
 #5
-
-
+depth_temp<-ggplot(chemistry_physics,aes(x=depth,y=temperature_C))+
+  geom_point()+
+  geom_smooth(method = "lm",se=FALSE,color="dark blue")+
+  ylim(0,35)+
+  labs(x="Depth",y="Temperature")
+print(depth_temp)
 ```
 
 
 6. Interpret the figure. What does it suggest with regards to the response of temperature to depth? Do the distribution of points suggest about anything about the linearity of this trend?
 
-> Answer: 
+> Answer: From the figure we can see that as the lake goes deeper, the temperature goes lower and from the distribution of points we can suppose that in every fixed depth, the temperature is "normally" distributed across the line, meaning that there is trend of linearity. 
 
 
 7. Perform a linear regression to test the relationship and display the results
 
 ```{r linear.regression}
 #7
-
-
+depth.temp.regression<-lm(chemistry_physics$temperature_C~chemistry_physics$depth)
+summary(depth.temp.regression)
+cor.test(chemistry_physics$depth,chemistry_physics$temperature_C)
 ```
 
 
 8. Interpret your model results in words. Include how much of the variability in temperature is explained by changes in depth, the degrees of freedom on which this finding is based, and the statistical significance of the result. Also mention how much temperature is predicted to change for every 1m change in depth. 
 
-> Answer:
-
+> Answer: about 73.87% variability in temperature is explained by changes in depth based on 9726 degrees of freedom. since p-value: < 2.2e-16, it means that our null hypothesis that mean lake temperature recorded during July is the same with depth across all lakes is not established and we have confidence in that temperature recorded varies with depth across all lakes. For every 1m change in depth, the temperature is predicted to change -1.94621 celsius. 
 
 ---
 
@@ -91,17 +109,16 @@ Let's tackle a similar question from a different approach. Here, we want to expl
 
 ```{r temperature.model}
 #9
-
-
-
+AIC1<-lm(data=chemistry_physics,temperature_C~year4+daynum+depth)
+step(AIC1)
 #10
-
-
+model<-lm(data=chemistry_physics,temperature_C~year4+daynum+depth)
+summary(model)
 ```
 
 11. What is the final set of explanatory variables that the AIC method suggests we use to predict temperature in our multiple regression? How much of the observed variance does this model explain? Is this an improvement over the model using only depth as the explanatory variable?
 
-> Answer: 
+> Answer: the final set of explanatory variables are year4, daynum, depth. this model can explain 74.12% observed variance. this is an improvent over the model using only depth as the explanatory variable where the variance can only be explained by 73.87%. 
 
 
 
@@ -112,13 +129,18 @@ Let's tackle a similar question from a different approach. Here, we want to expl
 
 ```{r anova.model}
 #12
+#ANOVA model
+lake.temp <- aov(data = chemistry_physics, temperature_C ~ lakename)
+summary(lake.temp)
 
-
+#lm model
+lake.temp2 <- lm(data = chemistry_physics, temperature_C ~ lakename)
+summary(lake.temp2)
 ```
 
 13. Is there a significant difference in mean temperature among the lakes? Report your findings. 
 
-> Answer: 
+> Answer: the p-value of this F test is <2e-16, which means by p=0.05 cut-off, there is a significant difference in mean temperature among the lakes. 
 
 
 
@@ -126,26 +148,31 @@ Let's tackle a similar question from a different approach. Here, we want to expl
 
 ```{r scatterplot.2}
 #14.
-
-
+temp.depth.plot<-ggplot(chemistry_physics,aes(x=depth,y=temperature_C, color=lakename))+
+  geom_point(alpha = 0.5)+
+  geom_smooth(method = "lm", se = FALSE)+
+  ylim(0,35)+
+  labs(y="Temperature (Celsius)")
+print(temp.depth.plot)
 ```
 
 15. Use the Tukey's HSD test to determine which lakes have different means.
 
 ```{r tukey.test}
 #15
+TukeyHSD(lake.temp)
 
+lake.temp.groups <- HSD.test(lake.temp, "lakename", group = TRUE)
+lake.temp.groups 
 
 ```
 
 16.From the findings above, which lakes have the same mean temperature, statistically speaking, as Peter Lake? Does any lake have a mean temperature that is statistically distinct from all the other lakes?
 
->Answer:
-
- 
+>Answer:Ward lake and Paul lake have the same mean temperature statistically speaking as Peter lake. From the  Tukey's HSD test we can see that no lake has a mean temperature that is statistically distinct from all the other lakes. 
 
 17. If we were just looking at Peter Lake and Paul Lake. What's another test we might explore to see whether they have distinct mean temperatures? 
 
->Answer: 
+>Answer: Pairewise T-test. 
 
 
